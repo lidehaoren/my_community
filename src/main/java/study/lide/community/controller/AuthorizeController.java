@@ -11,7 +11,9 @@ import study.lide.community.dto.GithubUser;
 import study.lide.community.mapper.UserMapper;
 import study.lide.community.model.User;
 import study.lide.community.provider.GithubProvider;
-import javax.servlet.http.HttpServletRequest;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletResponse;
 import java.util.UUID;
 
 /**
@@ -39,7 +41,7 @@ public class AuthorizeController {
     /*用户选择授权给我们之后，github会调用我们的回调地址，并携带一些参数，如code*/
     public String callback(@RequestParam(name="code") String code,
                            @RequestParam(name="state") String state,
-                           HttpServletRequest request){
+                           HttpServletResponse response){
         AccessTokenDTO accessTokenDTO = new AccessTokenDTO();
         accessTokenDTO.setClient_id(client_id);
         accessTokenDTO.setCode(code);
@@ -53,14 +55,24 @@ public class AuthorizeController {
 
         if(githubUser != null){
             User user = new User();
-            user.setToken(UUID.randomUUID().toString());
+            //将用户编号作为cookie
+            String token = UUID.randomUUID().toString();
+
+
+            user.setToken(token);
             user.setName(githubUser.getName());
             user.setAccountId(String.valueOf(githubUser.getId()));
             user.setGmtCreate(System.currentTimeMillis());
             user.setGmtModify(user.getGmtCreate());
             /*将用户信息保存到数据库中*/
             userMapper.insert(user);
-            request.getSession().setAttribute("user", githubUser);
+            /*
+            * 实现登录持久化操作，因为当一个浏览器的session结束之后，理论上用户在一定期内
+            * 是不需要再次登录的
+            * 1.将用户编号作为cookie
+            * */
+            response.addCookie(new Cookie("token", token));
+
             //登录成功，重定向回到主页
             return "redirect:/";
         }else{
